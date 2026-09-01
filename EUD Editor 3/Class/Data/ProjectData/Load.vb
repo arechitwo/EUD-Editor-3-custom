@@ -69,6 +69,16 @@ Partial Public Class ProjectData
                 _pjdata.NewFIle()
                 _pjdata.InitData()
                 _pjdata.SaveData = bf.Deserialize(stm)
+
+                ' SCA has been removed from this custom build.
+                ' Keep the legacy serialized object for .e3s compatibility, but never reactivate it.
+                If _pjdata.SaveData IsNot Nothing AndAlso
+                   _pjdata.SaveData.TEData IsNot Nothing AndAlso
+                   _pjdata.SaveData.TEData.SCArchive IsNot Nothing Then
+                    _pjdata.SaveData.TEData.SCArchive.IsUsed = False
+                    _pjdata.SaveData.TEData.SCArchive.IsLogin = False
+                End If
+
                 _pjdata.LoadInit(FilePath)
                 _pjdata.Legacy()
                 stm.Close()

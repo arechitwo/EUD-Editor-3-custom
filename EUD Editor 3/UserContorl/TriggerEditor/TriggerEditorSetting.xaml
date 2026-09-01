@@ -47,13 +47,6 @@
             <TabItem Header="{StaticResource TE_BGMSetting}">
                 <local:BGMManager/>
             </TabItem>
-
-            <TabItem Header="{StaticResource TE_SCASetting}">
-                <local:SCASetting x:Name="SCASettingTab"/>
-            </TabItem>
-            <TabItem Header="{StaticResource TE_SCAScriptSetting}">
-                <local:SCAScriptSetting x:Name="SCAScriptSettingTab"/>
-            </TabItem> 
         </TabControl>
     </Grid>
 </UserControl>
