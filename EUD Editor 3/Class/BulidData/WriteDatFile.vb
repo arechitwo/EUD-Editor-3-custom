@@ -30,42 +30,36 @@ Partial Public Class BuildData
                         ParameterData.PureData(ObjectID).IsDefault Then
                         Continue For
                     End If
-                    Dim OldValue As Long
                     Dim NewValue As Long = ParameterData.PureData(ObjectID).Data
-                    Dim CurrentValue As Long
                     Dim CalOffset As UInteger = Offset + ObjectID * Length
-                    Dim ByteShift As Byte = CalOffset Mod 4
-                    Dim RealValue As Long
-                    Dim RealOffset As UInteger = CalOffset - CalOffset Mod 4
 
-                    Try
-                        If pjData.MapData.DatFile.GetDatFile(DatFile).GetParamValue(Parameter, ObjectID).IsDefault Then '맵 데이터가 없을 경우
-                            OldValue = scData.DefaultDat.GetDatFile(DatFile).ParameterList(Pindex).PureData(ObjectID).Data
+                    If Size <> 1 AndAlso Size <> 2 AndAlso Size <> 4 Then
+                        Throw New InvalidOperationException("Unsupported DAT field size: " & Size)
+                    End If
+                    If NewValue < 0 OrElse CULng(NewValue) >= (1UL << (8 * CInt(Size))) Then
+                        Throw New InvalidOperationException("DAT value is outside the field range: " & NewValue)
+                    End If
+
+                    '절대값으로 설정하며 같은 DWORD의 다른 필드를 보존한다.
+                    'DWORD 경계를 넘는 필드는 두 액션으로 나누어 기록한다.
+                    Dim Written As Integer = 0
+                    While Written < Size
+                        Dim FieldOffset As UInteger = CalOffset + CUInt(Written)
+                        Dim ByteShift As Integer = CInt(FieldOffset Mod 4)
+                        Dim RealOffset As UInteger = FieldOffset - CUInt(ByteShift)
+                        Dim ChunkSize As Integer = Math.Min(CInt(Size) - Written, 4 - ByteShift)
+                        Dim ChunkMask As ULong = (1UL << (8 * ChunkSize)) - 1UL
+                        Dim Mask As ULong = ChunkMask << (8 * ByteShift)
+                        Dim RealValue As ULong = ((CULng(NewValue) >> (8 * Written)) And ChunkMask) << (8 * ByteShift)
+
+                        If ChunkSize = 4 Then
+                            sb.Append("        SetMemory(0x" & Hex(RealOffset).ToUpper & ", SetTo, " & RealValue & "),")
                         Else
-                            OldValue = pjData.MapData.DatFile.GetDatFile(DatFile).ParameterList(Pindex).PureData(ObjectID).Data
+                            sb.Append("        SetMemoryX(0x" & Hex(RealOffset).ToUpper & ", SetTo, " & RealValue & ", 0x" & Hex(Mask).ToUpper & "),")
                         End If
-                    Catch ex As Exception
-                        OldValue = scData.DefaultDat.GetDatFile(DatFile).ParameterList(Pindex).PureData(ObjectID).Data
-                    End Try
-
-
-                    CurrentValue = NewValue - OldValue
-                    RealValue = CurrentValue * Math.Pow(256, ByteShift)
-
-                    sb.Append("        SetMemory(0x" & Hex(RealOffset).ToUpper & ", Add, " & RealValue & "),")
-
-
-                    'Select Case Size
-                    '    Case 4
-                    '        sb.Append("    f_dwwrite_epd(EPD(0x" & Hex(Offset + ObjectID * Length).ToUpper & ")," & ParamaterData.PureData(ObjectID).Data & ")")
-                    '    Case 2
-                    '        sb.Append("    f_wwrite_epd(EPD(0x" & Hex(Offset + ObjectID * Length).ToUpper & ")," & ParamaterData.PureData(ObjectID).Data & ", " & (Offset + ObjectID * Length) Mod 4 & ")")
-                    '    Case 1
-                    '        sb.Append("    f_bwrite_epd(EPD(0x" & Hex(Offset + ObjectID * Length).ToUpper & ")," & ParamaterData.PureData(ObjectID).Data & ", " & (Offset + ObjectID * Length) Mod 4 & ")")
-                    'End Select
-
-
-                    sb.AppendLine("# " & Datfilesname(DatFile) & ":" & Parameter & "  index:" & ObjectID & "    from " & OldValue & " To " & NewValue)
+                        sb.AppendLine("# " & Datfilesname(DatFile) & ":" & Parameter & "  index:" & ObjectID & "    set to " & NewValue)
+                        Written += ChunkSize
+                    End While
                 Next
                 'pjData.Dat.Data(DatFile, Parameter, ObjectID)
             Next
